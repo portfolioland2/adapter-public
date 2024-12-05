@@ -1,0 +1,66 @@
+version: "3.9"
+
+networks:
+  local:
+    driver: bridge
+    name: rkeeper-stage
+  global:
+    name: crm-global
+    external: true
+
+services:
+  celery:
+    networks:
+      - local
+    image: ${CI_REGISTRY}/${CI_PROJECT_NAME}/web:stage
+    command: bash -c "./start.celery.sh"
+    restart: always
+    logging:
+      options:
+        max-size: 512m
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    container_name: ${COMPOSE_PROJECT_NAME}_celery
+
+  web:
+    networks:
+      - local
+      - global
+    image: ${CI_REGISTRY}/${CI_PROJECT_NAME}/web:stage
+    command: bash -c "./start.sh"
+    restart: always
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    container_name: ${COMPOSE_PROJECT_NAME}_web
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.stage-rkeeper-backend-http.rule=Host(`${DOMAIN?Variable not set}`) && PathPrefix(`/stage`)
+      - traefik.http.routers.stage-rkeeper-backend-http.entrypoints=https
+      - traefik.http.middlewares.stage-stripprefix.stripprefix.prefixes=/stage
+      - traefik.http.routers.stage-rkeeper-backend-http.middlewares=stage-stripprefix
+
+  redis:
+    networks:
+      - local
+    image: "redislabs/rejson"
+    restart: always
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./volumes/redis:/data
+      - ./deploy/configs/redis.conf:/usr/local/etc/redis/redis.conf
+      - ./redisearch.so:/usr/lib/redis/modules/redisearch.so
+    container_name: ${COMPOSE_PROJECT_NAME}_redis
+
+  db:
+    image: "postgres:16"
+    env_file:
+      - .env
+    restart: always
+    networks:
+      - local
+    volumes:
+      - ./volumes/postgres/data:/var/lib/postgresql/data
