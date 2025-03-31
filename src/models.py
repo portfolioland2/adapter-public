@@ -22,6 +22,7 @@ class Client(Base):
 
     client_id: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     client_secret: Mapped[str] = mapped_column(String, nullable=False)
+    secret_key: Mapped[str] = mapped_column(String, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
     api_key: Mapped[str] = mapped_column(String, nullable=False, unique=True)
