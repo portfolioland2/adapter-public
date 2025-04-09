@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Any, List, Dict, Union
 from urllib.parse import urljoin
 
 import httpx
@@ -89,57 +89,44 @@ class SBISClient:
             logger.exception("could not parse menu", client_id=self.client.client_id, json=data)
             raise e
 
-    def get_shops(self) -> list[RKeeperShop]:
-        url = urljoin(self.base_url, f"orderSources/{self.client.client_id}/restaurants")
+    def get_district(self, shop_id: str) -> Any:
+        url = urljoin(self.base_url, "district/list")
+        params = {"pointId": shop_id}
+        response = self._fetch(url, params)
+        response.raise_for_status()
 
-        try:
-            response = self._fetch(url)
-            shops = response.json()["result"]
-            logger.info("Get shops", client_id=self.client.client_id, url=url, response=shops)
+        data = response.json()["result"]
+        return data
 
-            return [RKeeperShop(**shop) for shop in shops]
-        except httpx.RequestError:
-            raise RkeeperClientError
-        except Exception as e:
-            logger.exception(
-                "could not parse shops",
-                client_id=self.client.client_id,
-                content=response.content,
-                shops=shops,
-            )
-            raise e
+    def get_delivery_cost(self, shop_id: str, address: str | dict[str, Any]) -> Any:
+        url = urljoin(self.base_url, "district/list")
+        params = {"pointId": shop_id, "address": address}
+        response = self._fetch(url, params)
+        response.raise_for_status()
 
-    def get_status_of_orders(self) -> list[RKeeperOrderStatus]:
-        url = urljoin(self.base_url, "orders")
-        response = self._fetch(url)
-        orders = response.json()["result"]
+        data = response.json()["result"]
+        return data
 
-        return [RKeeperOrderStatus(**order) for order in orders]
+    def get_delivery_eta(self, shop_id: str) -> Any:
+        url = urljoin(self.base_url, "delivery/calendar")
+        params = {"pointId": shop_id}
+        response = self._fetch(url, params)
+        response.raise_for_status()
 
-    def preliminary_calculation(self, order: RKeeperOrder) -> OrderDraft:
-        url = "orders/delivery"
-        response = self._pos_request(url, order).json()
-        logger.info(
-            "Created order draft",
-            json=response,
-            url=url,
-            token=self.token,
-            client_id=self.client.client_id,
-            order=order.dict(by_alias=True),
-        )
-        if "result" in response:
-            return OrderDraft(**response["result"]["amount"])
-        logger.error(
-            "Error order draft",
-            json=response,
-            url=url,
-            token=self.token,
-            client_id=self.client.client_id,
-        )
-        raise RkeeperClientInvalidError(f'errors={response["errors"]} msg={response["msg"]}')
+        data = response.json()["result"]
+        return data
+
+    def get_delivery_suggested(self, entered_address: str) -> Any:
+        url = urljoin(self.base_url, "delivery/suggested-address")
+        params = {"enteredAddress": entered_address}
+        response = self._fetch(url, params)
+        response.raise_for_status()
+
+        data = response.json()["result"]
+        return data
 
     def create_order(self, order: RKeeperOrder) -> str:
-        url = "orders"
+        url = "order/create"
         response = self._pos_request(url, order).json()
         logger.info(
             "Created order",
